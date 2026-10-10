@@ -1,7 +1,7 @@
-# DECISIONS.md  (about 150-200 words in total - plain language, your own words)
+# DECISIONS.md
 
-1. **Indexes.** Which indexes did you create, and which query or guarantee does each one serve? Which one did you consider and reject?
-2. **Punch-in race.** Two identical punch-in requests arrive at the same instant. Walk through exactly what happens in your code.
-3. **Ties.** Two employees are tied on late minutes at the cutoff of `limit`. What does your leaderboard return, and why?
-4. **Headcount.** How does your department summary make sure employees with zero logs are counted?
-5. **One thing you would change** if this had to serve 100x the data.
+1. **Indexes.** I created a unique index on `emp_code` for the `employees` collection to handle race conditions during employee creation. For `attendance_logs`, I created a unique index on `(emp_code, date)` to handle race conditions during punch-in. I also created an index on `(date, -1), (emp_code, 1)` to support fast sorting and filtering for the `attendance_list` endpoint. I considered an index on `status` but decided against it because its cardinality is too low to be useful.
+2. **Punch-in race.** When two identical punch-in requests arrive simultaneously, they will both attempt to insert into the `attendance_logs` collection. Thanks to the unique index on `(emp_code, date)`, MongoDB will lock the index and process the inserts serially. The first one succeeds and returns a 201. The second one fails with a `DuplicateKeyError` and we catch it to return a 409 Conflict.
+3. **Ties.** (Placeholder - aggregation not fully implemented) Standard competition ranking assigns the same rank to ties. The array position is ignored.
+4. **Headcount.** (Placeholder - aggregation not fully implemented) A `$lookup` joined from the `employees` collection allows us to count employees with no logs since they are still in the `employees` collection.
+5. **One thing you would change.** For 100x the data (~10 million records), the aggregations for analytical queries would be too slow if computed on the fly. I would implement a daily roll-up (materialized view) to precompute and store daily/monthly department summaries.
